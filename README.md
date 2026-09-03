@@ -6,14 +6,11 @@ SONAR-SHIELD is an end-to-end AI-assisted underwater sonar intelligence platform
 
 The platform follows a human-in-the-loop approach in which AI assists the analysis process while human experts retain control over final interpretation and decisions.
 
----
-
 ## 🚀 Overview
 
 Side-scan sonar surveys can generate large amounts of underwater imagery. Manually inspecting and organizing these images can be time-consuming, especially when multiple detections need to be reviewed, compared, prioritized, and documented.
 
 SONAR-SHIELD provides a unified workflow that transforms sonar imagery into structured decision-support information.
-
 The complete pipeline is:
 
 Side-Scan Sonar Image
