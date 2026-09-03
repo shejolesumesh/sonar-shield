@@ -6,15 +6,41 @@ This is a prototype/decision-support tool, not a validated marine-survey system.
 
 ## Screenshots
 
-_Add screenshots here once available._
+### Dashboard
 
-```
-screenshots/dashboard.png
-screenshots/sonar-analysis.png
-screenshots/detection-details.png
-screenshots/map.png
-screenshots/expert-review.png
-```
+![SONAR-SHIELD Dashboard](screenshots/dashboard.png)
+
+### Sonar Analysis
+
+![Sonar Analysis](screenshots/sonar-analysis.png)
+
+### Sonar Analysis - Upload Interface
+
+![Sonar Analysis Upload Interface](screenshots/sonar-analysis1.png)
+
+### Sonar Analysis - Detection Results
+
+![Sonar Analysis Detection Results](screenshots/sonar-results.png)
+
+### Recovery Priority
+
+![Recovery Priority Queue](screenshots/recovery-priority.png)
+
+### Map & Heatmap
+
+![Debris Map and Density Heatmap](screenshots/map-heatmap.png)
+
+### Expert Review
+
+![Expert Review Queue](screenshots/expert-review.png)
+
+### Reports & Export
+
+![Reports and Export](screenshots/reports.png)
+
+### Model Information
+
+![Model Information](screenshots/model-info.png)
 
 ## What it does
 
