@@ -1,0 +1,42 @@
+# Environment / secrets
+.env
+.env.*
+
+
+# Node
+node_modules/
+dist/
+build/
+.vite/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+ENV/
+
+# Testing / cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated test data
+backend/tests/_test_data/
+
+# Runtime data
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

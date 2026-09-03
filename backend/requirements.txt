@@ -1,0 +1,25 @@
+fastapi>=0.111,<1.0
+uvicorn[standard]>=0.30
+pydantic>=2.7,<3.0
+SQLAlchemy>=2.0.30,<3.0
+python-multipart>=0.0.9
+python-dotenv>=1.0.1
+opencv-python-headless>=4.10
+numpy>=1.26
+Pillow>=10.4
+pytest>=8.2
+httpx>=0.27
+onnxruntime>=1.18
+# Optional: only required if DETECTOR_TYPE=pytorch
+# torch>=2.3
+# torchvision>=0.18
+
+# NOTE ON PYTHON VERSIONS:
+# These are minimum-version constraints (not exact pins) on purpose.
+# numpy/Pillow/opencv only ship prebuilt wheels for Python versions that
+# existed when that package version was released. If you use a very new
+# Python (e.g. 3.14 the week it comes out), pip may be forced to compile
+# numpy/Pillow from source, which requires a modern C/C++ toolchain and
+# often fails on Windows. If you hit build errors, the simplest fix is to
+# use Python 3.11 or 3.12 in your virtual environment instead - see
+# backend/README.md.
