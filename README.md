@@ -16,7 +16,6 @@ SONAR-SHIELD provides a unified workflow that transforms sonar imagery into stru
 
 The complete pipeline is:
 
-```text
 Side-Scan Sonar Image
         +
 Optional GPS / Depth Metadata
