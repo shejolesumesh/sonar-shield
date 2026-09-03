@@ -1,4 +1,3 @@
-````markdown
 # 🌊 SONAR-SHIELD
 
 ## AI-Powered Underwater Side-Scan Sonar Intelligence & Marine Debris Decision-Support Platform
@@ -220,7 +219,6 @@ SONAR-SHIELD aims to:
 
 # 🏗️ System Architecture
 
-```text
                          SONAR-SHIELD
                               │
                               ▼
