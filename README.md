@@ -1,1014 +1,181 @@
-# 🌊 SONAR-SHIELD
+# SONAR-SHIELD
 
-## AI-Powered Underwater Side-Scan Sonar Intelligence & Marine Debris Decision-Support Platform
+AI-assisted side-scan sonar analysis prototype. Takes a sonar image, runs it through a preprocessing pipeline, feeds it to a detector, and turns the raw prediction into something a human can actually review — confidence, evidence, a risk score, a priority level, and (if GPS data exists) a location on a map.
 
-SONAR-SHIELD is an end-to-end AI-assisted underwater sonar intelligence platform designed to analyze side-scan sonar imagery, identify potential submerged objects, evaluate detection confidence, organize available evidence, estimate prototype risk, prioritize detections, visualize their geographic distribution, and support expert review.
+This is a prototype/decision-support tool, not a validated marine-survey system. See the Limitations and Disclaimer sections before assuming anything here is production-ready.
 
-The platform follows a human-in-the-loop approach in which AI assists the analysis process while human experts retain control over final interpretation and decisions.
+## Screenshots
 
----
+_Add screenshots here once available._
 
-## 🚀 Overview
-
-Side-scan sonar surveys can generate large amounts of underwater imagery. Manually inspecting and organizing these images can be time-consuming, especially when multiple detections need to be reviewed, compared, prioritized, and documented.
-
-SONAR-SHIELD provides a unified workflow that transforms sonar imagery into structured decision-support information.
-
-The complete pipeline is:
-
-```text
-Side-Scan Sonar Image
-        +
-Optional GPS / Depth Metadata
-        ↓
-Data Ingestion
-        ↓
-Sonar Preprocessing
-        ↓
-AI Detection
-        ↓
-Confidence Analysis
-        ↓
-Evidence Generation
-        ↓
-Risk Assessment
-        ↓
-Recovery Priority
-        ↓
-Database Storage
-        ↓
-FastAPI REST API
-        ↓
-React Dashboard
-        ↓
-Geospatial Visualization
-        ↓
-Expert Review
-        ↓
-Feedback Storage
-        ↓
-Future Dataset / Model Improvement
-````
-
-The key idea behind SONAR-SHIELD is to move beyond simple object detection and provide a complete:
-
-**Detect → Understand → Assess → Prioritize → Review → Report**
-
-workflow.
-
----
-
-## 🎯 Problem Statement
-
-Underwater environments can contain submerged objects and debris that may be difficult to identify through manual sonar inspection.
-
-Side-scan sonar provides valuable acoustic imagery, but large-scale sonar surveys can produce a significant amount of data that requires careful analysis.
-
-A conventional workflow may look like:
-
-```text
-Sonar Survey
-     ↓
-Large Collection of Images
-     ↓
-Manual Inspection
-     ↓
-Manual Detection
-     ↓
-Manual Interpretation
-     ↓
-Manual Prioritization
-     ↓
-Manual Reporting
+```
+screenshots/dashboard.png
+screenshots/sonar-analysis.png
+screenshots/detection-details.png
+screenshots/map.png
+screenshots/expert-review.png
 ```
 
-This creates several challenges:
+## What it does
 
-* Large volumes of sonar imagery
-* Repetitive manual inspection
-* Dependence on expert availability
-* Difficulty maintaining consistent analysis
-* Difficulty prioritizing multiple detections
-* Separation between detection and geographic information
-* Difficulty maintaining review history
-* Difficulty converting detections into structured reports
+Side-scan sonar surveys produce a lot of images, and going through them one by one is slow. SONAR-SHIELD doesn't just run a detector and spit out a bounding box — it wraps the prediction in some context:
 
-A basic AI detector only addresses the detection problem.
+- What did the model detect, and how confident was it?
+- If confidence is low, don't force it into a known class — flag it as unknown instead.
+- What evidence actually backs up the detection, and what's just not available?
+- Given confidence, severity, size, and location, what's a reasonable priority for someone to go check this out?
+- Where is it, if GPS metadata was attached?
+- Can a person confirm, reject, or reclassify the prediction, and is that review kept separate from the original AI output?
 
-A practical decision-support platform should also answer:
+None of this is meant to replace a domain expert — it's meant to make their job of triaging detections faster.
 
-* What was detected?
-* How confident is the AI?
-* Is the confidence sufficient to assign a known class?
-* What evidence is actually available?
-* What information is unavailable?
-* What is the prototype risk score?
-* Which detection should be investigated first?
-* Where is the detection located?
-* Can an expert review the prediction?
-* Can the review be stored?
-* Can the result be exported?
+## How it works
 
-SONAR-SHIELD is designed around these requirements.
+1. A sonar image (plus optional GPS/depth metadata) is uploaded.
+2. The image goes through the preprocessing pipeline (denoising, contrast enhancement, letterboxing to model input size).
+3. The processed image is passed to whatever detector is configured (ONNX by default).
+4. The prediction's confidence is checked against a threshold — below it, the detection is marked as an unknown anomaly instead of a known class.
+5. An evidence card is generated summarizing what's known and explicitly flagging what isn't.
+6. A prototype risk score (0–100) is calculated from confidence, severity, size, and location.
+7. The detection gets a recovery priority (P1–P4) based on that score.
+8. Everything is saved to SQLite and served through the FastAPI backend.
+9. The React frontend shows it on a dashboard, with map/heatmap views if GPS data exists.
+10. A reviewer can confirm, reject, or reclassify the detection — this is stored alongside, not instead of, the original AI result.
 
----
+## Architecture
 
-## 💡 Proposed Solution
-
-SONAR-SHIELD combines computer vision, AI inference, decision-support logic, geospatial visualization, database persistence, reporting, and human review into a single platform.
-
-```text
-┌────────────────────────────────────────────────────┐
-│                   SONAR-SHIELD                     │
-├────────────────────────────────────────────────────┤
-│                                                    │
-│  Sonar Image + Metadata                            │
-│              ↓                                     │
-│  Image Preprocessing                               │
-│              ↓                                     │
-│  AI Detection                                      │
-│              ↓                                     │
-│  Confidence / Unknown Analysis                     │
-│              ↓                                     │
-│  Evidence Engine                                   │
-│              ↓                                     │
-│  Risk Assessment                                   │
-│              ↓                                     │
-│  Recovery Priority                                 │
-│              ↓                                     │
-│  Database                                          │
-│              ↓                                     │
-│  FastAPI REST API                                  │
-│              ↓                                     │
-│  React Dashboard                                   │
-│              ↓                                     │
-│  Map / Heatmap / Analysis / Reports                │
-│              ↓                                     │
-│  Expert Review                                     │
-│              ↓                                     │
-│  Feedback                                          │
-│                                                    │
-└────────────────────────────────────────────────────┘
+```
+Sonar Image + Metadata
+        │
+        ▼
+  Preprocessing (OpenCV/NumPy)
+        │
+        ▼
+   AI Detection (ONNX / PyTorch / Demo)
+        │
+        ▼
+  Confidence Handling (known class vs. unknown anomaly)
+        │
+        ▼
+   Evidence Engine
+        │
+        ▼
+   Risk Engine (0-100)
+        │
+        ▼
+   Priority Engine (P1-P4)
+        │
+        ▼
+   SQLite (SQLAlchemy)
+        │
+        ▼
+   FastAPI
+        │
+        ▼
+   React Frontend ── Map / Heatmap / Reports
+        │
+        ▼
+   Expert Review → Feedback Storage
 ```
 
----
+## Main features
 
-## 🌊 Why SONAR-SHIELD?
+**AI / detection**
+- Detector abstraction (`BaseDetector`) with ONNX, PyTorch adapter, and a deterministic demo detector for UI testing
+- Confidence thresholding with unknown-anomaly fallback
 
-Instead of stopping at:
+**Preprocessing**
+- Grayscale conversion, median + bilateral filtering, normalization, CLAHE, shadow enhancement, letterboxing to 640×640
 
-```text
-Object Detected
+**Decision support**
+- Evidence cards that explicitly mark unavailable info instead of guessing
+- Configurable prototype risk score
+- P1–P4 recovery priority
+
+**Visualization**
+- Dashboard, detection details, interactive map (Leaflet), heatmap, charts (Recharts)
+
+**Review**
+- Confirm / reject / reclassify, with the original AI prediction preserved regardless of the review outcome
+
+**Reporting**
+- CSV and JSON export
+
+## AI model
+
+The currently integrated model is **GhostVision ONNX**, run through ONNX Runtime. The supplied class mapping (`class_names.txt`) only contains one class:
+
 ```
-
-SONAR-SHIELD attempts to provide:
-
-```text
-Object Detected
-      ↓
-Confidence
-      ↓
-Evidence
-      ↓
-Risk
-      ↓
-Recovery Priority
-      ↓
-Location
-      ↓
-Expert Review
-      ↓
-Report
-```
-
-This creates a structured decision-support workflow around AI predictions.
-
-The system is not designed to replace domain experts.
-
-It is designed to help experts:
-
-* Find potential detections faster
-* Understand available information
-* Identify uncertain detections
-* Prioritize detections
-* Review AI predictions
-* Maintain structured records
-* Generate reports
-
----
-
-## 🎯 Objectives
-
-SONAR-SHIELD aims to:
-
-1. Assist with automated side-scan sonar image analysis.
-2. Reduce repetitive manual inspection.
-3. Provide a structured AI-assisted detection workflow.
-4. Preserve uncertainty in AI predictions.
-5. Avoid fabricating unavailable evidence.
-6. Generate transparent prototype risk scores.
-7. Prioritize detections for investigation.
-8. Provide geographic visualization when location data is available.
-9. Enable expert review of AI predictions.
-10. Preserve human feedback.
-11. Generate structured reports.
-12. Provide a modular architecture for future AI models.
-13. Provide a foundation for future validated marine-survey applications.
-
----
-
-# 🏗️ System Architecture
-
-                         SONAR-SHIELD
-                              │
-                              ▼
-                ┌─────────────────────────┐
-                │       SONAR DATA        │
-                │                         │
-                │ Images                  │
-                │ GPS                     │
-                │ Depth                   │
-                │ Metadata                │
-                └────────────┬────────────┘
-                             │
-                             ▼
-                ┌─────────────────────────┐
-                │      DATA INGESTION     │
-                │                         │
-                │ Validation              │
-                │ Upload Handling         │
-                │ Storage                 │
-                └────────────┬────────────┘
-                             │
-                             ▼
-                ┌─────────────────────────┐
-                │   SONAR PREPROCESSING   │
-                │                         │
-                │ OpenCV                  │
-                │ NumPy                   │
-                │ Denoising               │
-                │ Normalization           │
-                │ CLAHE                   │
-                │ Shadow Enhancement      │
-                │ Letterboxing            │
-                └────────────┬────────────┘
-                             │
-                             ▼
-          ┌────────────────────────────────────┐
-          │          AI DETECTION LAYER        │
-          │                                    │
-          │ ONNX Detector                     │
-          │ PyTorch Adapter                   │
-          │ Demo Detector                     │
-          └────────────────┬───────────────────┘
-                           │
-                           ▼
-                ┌─────────────────────────┐
-                │   CONFIDENCE ENGINE     │
-                │                         │
-                │ Known Class             │
-                │ Unknown Anomaly         │
-                └────────────┬────────────┘
-                             │
-                             ▼
-                ┌─────────────────────────┐
-                │     EVIDENCE ENGINE     │
-                │                         │
-                │ Evidence Cards          │
-                └────────────┬────────────┘
-                             │
-                             ▼
-                ┌─────────────────────────┐
-                │       RISK ENGINE       │
-                │                         │
-                │ Prototype Score 0-100   │
-                └────────────┬────────────┘
-                             │
-                             ▼
-                ┌─────────────────────────┐
-                │    PRIORITY ENGINE      │
-                │                         │
-                │ P1 / P2 / P3 / P4       │
-                └────────────┬────────────┘
-                             │
-                             ▼
-                ┌─────────────────────────┐
-                │      SQLITE DATABASE    │
-                └────────────┬────────────┘
-                             │
-                             ▼
-                ┌─────────────────────────┐
-                │      FASTAPI API        │
-                └────────────┬────────────┘
-                             │
-                             ▼
-                ┌─────────────────────────┐
-                │     REACT FRONTEND      │
-                │                         │
-                │ Dashboard               │
-                │ Sonar Analysis          │
-                │ Detection Details       │
-                │ Recovery Priority       │
-                │ Map / Heatmap            │
-                │ Expert Review           │
-                │ Reports                 │
-                │ Model Information       │
-                └────────────┬────────────┘
-                             │
-                             ▼
-                ┌─────────────────────────┐
-                │     EXPERT REVIEW       │
-                │                         │
-                │ Confirm                 │
-                │ Reject                  │
-                │ Reclassify              │
-                └────────────┬────────────┘
-                             │
-                             ▼
-                ┌─────────────────────────┐
-                │    FEEDBACK STORAGE     │
-                │                         │
-                │ Future Dataset           │
-                │ Model Improvement       │
-                └─────────────────────────┘
-```
-
----
-
-# 🔄 Complete Workflow
-
-## 1. Sonar Data
-
-The process begins with a side-scan sonar image.
-
-Optional metadata can include:
-
-* Latitude
-* Longitude
-* Depth
-* Survey information
-
-↓
-
-## 2. Data Ingestion
-
-The uploaded data is validated and stored before analysis.
-
-↓
-
-## 3. Preprocessing
-
-The sonar image is processed to improve its suitability for AI inference.
-
-↓
-
-## 4. AI Detection
-
-The processed image is passed to the configured detector.
-
-↓
-
-## 5. Confidence Analysis
-
-The system evaluates the confidence of the prediction.
-
-↓
-
-## 6. Unknown Anomaly Handling
-
-Low-confidence predictions can be represented as:
-
-```text
-UNKNOWN ANOMALY
-```
-
-rather than being forced into a known class.
-
-↓
-
-## 7. Evidence Generation
-
-The system organizes the available information into an Evidence Card.
-
-↓
-
-## 8. Risk Assessment
-
-A transparent prototype risk score is calculated.
-
-↓
-
-## 9. Recovery Priority
-
-The detection is assigned a priority level.
-
-↓
-
-## 10. Database
-
-Analysis results and review information are stored.
-
-↓
-
-## 11. Dashboard
-
-The React frontend presents the information to the user.
-
-↓
-
-## 12. Expert Review
-
-An expert can:
-
-```text
-CONFIRM
-REJECT
-RECLASSIFY
-```
-
-↓
-
-## 13. Reporting
-
-Results can be exported in structured formats.
-
-↓
-
-## 14. Future Improvement
-
-Human feedback can provide a foundation for future dataset creation and model improvement.
-
----
-
-# 🖼️ Sonar Preprocessing
-
-Raw sonar imagery may contain noise, inconsistent intensity, low contrast, and other characteristics that can affect downstream analysis.
-
-SONAR-SHIELD contains a dedicated preprocessing pipeline.
-
-```text
-Input Sonar Image
-        ↓
-Grayscale Processing
-        ↓
-Median Filtering
-        ↓
-Bilateral Filtering
-        ↓
-Normalization
-        ↓
-CLAHE
-        ↓
-Shadow Enhancement
-        ↓
-Letterboxing
-        ↓
-AI Model Input
-```
-
-### Denoising
-
-Median and bilateral filtering are used to reduce unwanted image noise while preserving relevant structures.
-
-### Normalization
-
-Image intensity values are normalized to create a more consistent representation.
-
-### CLAHE
-
-Contrast Limited Adaptive Histogram Equalization is used to improve local image contrast.
-
-### Shadow Enhancement
-
-Sonar shadows can provide useful contextual information around submerged objects.
-
-### Letterboxing
-
-The image is prepared for the expected model input dimensions while maintaining spatial proportions.
-
-The current inference pipeline uses:
-
-```text
-640 × 640
-```
-
-model input dimensions.
-
----
-
-# 🤖 AI Detection Engine
-
-SONAR-SHIELD uses a modular detector architecture.
-
-```text
-                    BaseDetector
-                         │
-          ┌──────────────┼──────────────┐
-          │              │              │
-          ▼              ▼              ▼
-    ONNX Detector   PyTorch Adapter   Demo Detector
-```
-
-This separation allows the underlying detection implementation to be replaced or extended without redesigning the entire platform.
-
-### ONNX Detector
-
-Used to integrate the supplied ONNX model through ONNX Runtime.
-
-### PyTorch Adapter
-
-Provides an architecture for integrating PyTorch-based detection models.
-
-### Demo Detector
-
-Provides deterministic detection behavior for development and UI testing.
-
----
-
-# 🧠 Current AI Model
-
-The current integrated real model is:
-
-```text
-GhostVision ONNX
-```
-
-The supplied class mapping currently contains:
-
-```text
 Crab-Pot
 ```
 
-Therefore, the currently integrated real detector is a:
+So right now this is a single-class crab-pot detector — not a general marine-debris detector. It doesn't identify fishing nets, cables, containers, wrecks, or anything else, even though the architecture is built to support more classes later.
 
-**Single-class Crab-Pot detector.**
+Inference pipeline:
 
-The application architecture is designed to support additional validated side-scan sonar classes and models in future versions.
-
-The project does not claim unsupported accuracy or performance metrics for the current model.
-
----
-
-# ⚙️ Model Inference
-
-The model inference pipeline is:
-
-```text
-Input Image
-     ↓
-Sonar Preprocessing
-     ↓
-640 × 640 Model Input
-     ↓
-ONNX Runtime
-     ↓
-Raw Model Output
-     ↓
-Post Processing
-     ↓
-Non-Maximum Suppression
-     ↓
-Confidence Processing
-     ↓
-Coordinate Mapping
-     ↓
-Detection Result
+```
+Preprocessed Image → 640×640 input ([1, 3, 640, 640]) → ONNX Runtime
+→ raw output → NMS → confidence check → coordinate mapping → detection result
 ```
 
-The current ONNX model uses an input representation corresponding to:
+Confidence handling uses a threshold (`KNOWN_CLASS_THRESHOLD`, default `0.70`):
 
-```text
-[1, 3, 640, 640]
+```
+confidence ≥ 0.70 → known class
+confidence <  0.70 → UNKNOWN ANOMALY
 ```
 
-The detector validates model assets and processes the model output before returning detection results.
+This keeps low-confidence guesses from being presented as if the model were sure about them.
 
-Post-processing includes non-maximum suppression and mapping detected coordinates back to the original image space.
+No accuracy, precision, recall, or mAP numbers are reported here, because the model hasn't been evaluated on a proper labeled dataset yet.
 
----
+## Evidence
 
-# ❓ Confidence & Unknown Anomaly Handling
+The evidence engine's job is to not make things up. If a property can't be determined from the current analysis, it's shown as:
 
-SONAR-SHIELD does not assume that every AI prediction is reliable.
-
-The system uses a configurable confidence threshold.
-
-Default:
-
-```text
-KNOWN_CLASS_THRESHOLD = 0.70
 ```
-
-The workflow is:
-
-```text
-                 AI Prediction
-                       ↓
-                  Confidence
-                       ↓
-             ┌─────────┴─────────┐
-             │                   │
-          ≥ 0.70              < 0.70
-             │                   │
-             ▼                   ▼
-       Known Class        UNKNOWN ANOMALY
-```
-
-This approach prevents low-confidence predictions from automatically being presented as confidently identified objects.
-
-Unknown Anomaly handling also creates a path for future discovery of objects that are not represented in the current model's known classes.
-
----
-
-# 🔎 Evidence Engine
-
-The Evidence Engine organizes information associated with each detection.
-
-The system follows an important principle:
-
-> **Do not fabricate evidence.**
-
-If a property cannot be reliably determined from the available analysis, the system can represent it as:
-
-```text
 Not available from current analysis
 ```
 
-This creates a clear distinction between:
+instead of being silently filled in or guessed.
 
-```text
-Available Evidence
-```
+## Risk and priority
 
-and:
-
-```text
-Unavailable Information
-```
-
-The Evidence Engine is therefore designed to improve transparency and prevent unsupported information from being presented as measured fact.
-
----
-
-# ⚠️ Risk Assessment Engine
-
-SONAR-SHIELD includes a transparent prototype risk-assessment engine.
-
-The current output is:
-
-```text
-Prototype Risk Score
-0 - 100
-```
-
-The score is intended for decision support and prioritization.
-
-It is **not a scientifically validated environmental-risk measurement.**
-
-### Current Risk Weights
+The risk score is a simple weighted heuristic, not a validated environmental risk model:
 
 | Factor     | Weight |
-| ---------- | -----: |
-| Confidence |   0.35 |
-| Severity   |   0.25 |
-| Size       |   0.20 |
-| Location   |   0.20 |
+|------------|-------:|
+| Confidence | 0.35   |
+| Severity   | 0.25   |
+| Size       | 0.20   |
+| Location   | 0.20   |
 
-Conceptually:
+It outputs a score from 0–100, which feeds into a P1–P4 priority bucket. Both the weights and the priority mapping are meant to be tunable — they're not tuned against real-world outcomes right now, so treat them as a starting point rather than a ground-truth ranking.
 
-```text
-                  Confidence
-                       │
-                       ▼
-                 ┌──────────┐
-                 │          │
-Severity ───────►│   RISK   │◄────── Size
-                 │          │
-                 └────┬─────┘
-                      ▲
-                      │
-                   Location
+## Expert review
+
+Reviewers can confirm, reject, or reclassify a detection. The review is stored as a separate record from the original AI prediction, so you always have both the original model output and what a human decided about it. This is stored but not currently used for automatic retraining — it's there as a foundation for building a labeled dataset later.
+
+## Technology stack
+
+**Frontend**
+- React, Vite, Tailwind CSS, React Router, Axios, Leaflet, Recharts
+
+**Backend**
+- Python, FastAPI, SQLAlchemy, Pydantic, SQLite
+
+**AI / CV**
+- ONNX Runtime, OpenCV, NumPy, PyTorch (adapter)
+
+**Infra**
+- Docker, Docker Compose, Git
+
+**Testing**
+- Pytest, FastAPI TestClient
+
+## Project structure
+
 ```
-
-The resulting score is constrained between:
-
-```text
-0 and 100
-```
-
-The risk engine is intentionally transparent and configurable rather than being presented as a scientifically validated black-box risk model.
-
----
-
-# 🚨 Recovery Priority Engine
-
-The Recovery Priority Engine uses the decision-support information to organize detections.
-
-Current priority levels:
-
-```text
-P1
-P2
-P3
-P4
-```
-
-Conceptually:
-
-```text
-Detection
-    ↓
-Risk Score
-    ↓
-Priority Engine
-    ↓
-┌────┬────┬────┬────┐
-│ P1 │ P2 │ P3 │ P4 │
-└────┴────┴────┴────┘
-```
-
-The priority system helps organize detections for investigation and potential recovery planning.
-
-These priority levels are part of the current prototype and should not be interpreted as scientifically validated recovery classifications.
-
----
-
-# 🗺️ Geospatial Intelligence
-
-SONAR-SHIELD supports geographic visualization when valid GPS metadata is available.
-
-### Interactive Map
-
-The frontend uses Leaflet for interactive geographic visualization.
-
-### Heatmap
-
-The platform can visualize the spatial concentration of detections through heatmap functionality.
-
-### Missing GPS Data
-
-If GPS information is unavailable, the system does not fabricate coordinates.
-
-This avoids presenting false geographic precision.
-
----
-
-# 👨‍🔬 Expert Review
-
-SONAR-SHIELD follows a human-in-the-loop architecture.
-
-AI predictions can be reviewed by an expert.
-
-The expert can:
-
-```text
-CONFIRM
-REJECT
-RECLASSIFY
-```
-
-The workflow is:
-
-```text
-                 AI Prediction
-                       │
-             ┌─────────┴─────────┐
-             │                   │
-             ▼                   ▼
-      Original Result       Expert Review
-                                 │
-                      ┌──────────┼──────────┐
-                      │          │          │
-                      ▼          ▼          ▼
-                   Confirm     Reject    Reclassify
-```
-
-The system preserves the distinction between the original AI output and the human review decision.
-
-This makes the workflow auditable and suitable for future feedback-driven development.
-
----
-
-# 🔁 Human Feedback Loop
-
-Expert feedback can form the foundation of a future model-improvement pipeline.
-
-```text
-AI Detection
-     ↓
-Expert Review
-     ↓
-Confirm / Reject / Reclassify
-     ↓
-Validated Data
-     ↓
-Future Dataset
-     ↓
-Model Training
-     ↓
-Model Evaluation
-     ↓
-Improved Model
-     ↓
-Deployment
-```
-
-The current implementation does **not automatically retrain the AI model**.
-
-Instead, expert feedback provides structured information that can be used in future dataset development and model validation.
-
----
-
-# 📊 Reporting
-
-SONAR-SHIELD provides structured reporting functionality.
-
-Supported output formats include:
-
-```text
-CSV
-JSON
-```
-
-Reports can be used for:
-
-* Analysis
-* Research
-* Documentation
-* Expert review
-* Dataset preparation
-* Future model evaluation
-
----
-
-# 🖥️ Frontend
-
-The frontend is built using React and provides the primary user interface.
-
-The application includes interfaces for:
-
-* Dashboard
-* Sonar Analysis
-* Detection Details
-* Recovery Priority
-* Map
-* Heatmap
-* Expert Review
-* Reports
-* Model Information
-
-The frontend communicates with the backend through REST APIs.
-
-API communication is centralized through the frontend service layer.
-
----
-
-# ⚙️ Backend
-
-The backend is built using Python and FastAPI.
-
-It is responsible for:
-
-* API endpoints
-* Upload handling
-* Data validation
-* Image preprocessing
-* AI inference
-* Detection processing
-* Confidence analysis
-* Evidence generation
-* Risk calculation
-* Priority calculation
-* Database operations
-* Expert feedback
-* Report generation
-
-The backend follows a modular architecture to keep responsibilities separated.
-
----
-
-# 🗄️ Database
-
-The current prototype uses:
-
-```text
-SQLite
-```
-
-with:
-
-```text
-SQLAlchemy
-```
-
-SQLite is suitable for the current prototype because it is:
-
-* Lightweight
-* File-based
-* Easy to configure
-* Easy to run locally
-* Suitable for development
-* Suitable for testing
-
-The architecture can be extended to a production database such as PostgreSQL in future deployments.
-
----
-
-# 🌐 API Architecture
-
-The communication flow is:
-
-```text
-React Frontend
-       ↓
-HTTP / REST
-       ↓
-FastAPI
-       ↓
-Application Services
-       ↓
-AI / Evidence / Risk / Priority
-       ↓
-SQLite Database
-```
-
-FastAPI also provides interactive API documentation.
-
-When running locally:
-
-```text
-http://localhost:8000/docs
-```
-
-The API includes functionality related to areas such as:
-
-* Health
-* Upload
-* Detection
-* Model information
-* Feedback
-* Heatmap
-* Reports
-* Risk
-* Expert review
-
----
-
-# 🧰 Technology Stack
-
-## Frontend
-
-| Technology   | Purpose                       |
-| ------------ | ----------------------------- |
-| React        | User interface                |
-| Vite         | Development and build tooling |
-| Tailwind CSS | Styling                       |
-| React Router | Frontend routing              |
-| Axios        | API communication             |
-| Leaflet      | Interactive maps              |
-| Recharts     | Data visualization            |
-
-## Backend
-
-| Technology | Purpose                      |
-| ---------- | ---------------------------- |
-| Python     | Backend programming language |
-| FastAPI    | REST API framework           |
-| SQLAlchemy | Database ORM                 |
-| Pydantic   | Data validation              |
-| SQLite     | Local database               |
-
-## AI & Computer Vision
-
-| Technology   | Purpose                        |
-| ------------ | ------------------------------ |
-| ONNX Runtime | ONNX model inference           |
-| OpenCV       | Image processing               |
-| NumPy        | Numerical and image operations |
-| PyTorch      | Optional detector adapter      |
-
-## Infrastructure
-
-| Technology     | Purpose                       |
-| -------------- | ----------------------------- |
-| Docker         | Containerization              |
-| Docker Compose | Multi-container orchestration |
-| Git            | Version control               |
-| GitHub         | Source-code hosting           |
-
-## Testing
-
-| Technology         | Purpose                     |
-| ------------------ | --------------------------- |
-| Pytest             | Backend testing             |
-| FastAPI TestClient | API testing                 |
-| Vite Build         | Frontend build verification |
-
----
-
-# 📁 Project Structure
-
-```text
 sonar-shield/
 │
 ├── backend/
@@ -1024,7 +191,6 @@ sonar-shield/
 │   │   ├── schemas/
 │   │   ├── services/
 │   │   └── utils/
-│   │
 │   ├── tests/
 │   ├── Dockerfile
 │   ├── requirements.txt
@@ -1045,870 +211,94 @@ sonar-shield/
 ├── data/
 │
 ├── docker-compose.yml
-├── .gitignore
-└── README.md
+└── .gitignore
 ```
 
----
+## Setup
 
-# ✨ Application Features
+Requirements: Python 3.x, Node.js, npm, Git, and Docker if you want the containerized route.
 
-## AI
-
-* AI-assisted sonar object detection
-* ONNX model inference
-* PyTorch detector adapter
-* Deterministic demo detector
-* Confidence thresholding
-* Unknown anomaly handling
-
-## Image Processing
-
-* Grayscale processing
-* Median filtering
-* Bilateral filtering
-* Normalization
-* CLAHE
-* Shadow enhancement
-* Letterboxing
-* Image-quality analysis
-
-## Decision Support
-
-* Evidence Cards
-* Prototype Risk Score
-* Configurable risk weights
-* Recovery Priority
-* P1-P4 prioritization
-
-## Visualization
-
-* Interactive dashboard
-* Detection details
-* Interactive map
-* Heatmap
-* GPS-aware visualization
-* Charts
-
-## Human-in-the-Loop
-
-* Confirm detection
-* Reject detection
-* Reclassify detection
-* Preserve original AI result
-* Store review feedback
-
-## Reporting
-
-* CSV export
-* JSON export
-
-## Engineering
-
-* FastAPI REST API
-* React frontend
-* SQLite persistence
-* Docker Compose
-* Automated backend testing
-
----
-
-# 📦 Installation
-
-## Requirements
-
-Recommended environment:
-
-```text
-Python 3.x
-Node.js
-npm
-Git
-Docker (optional)
-```
-
----
-
-# ▶️ Running Locally
-
-## Backend
-
-From the project root:
+### Backend
 
 ```bash
 cd backend
-```
-
-Create a virtual environment:
-
-```bash
 python -m venv venv
 ```
 
-### Windows
-
-```powershell
-.\venv\Scripts\activate
-```
-
-### Linux / macOS
+Activate it:
 
 ```bash
+# Windows
+.\venv\Scripts\activate
+
+# Linux / macOS
 source venv/bin/activate
 ```
 
-Install Python dependencies:
+Install and run:
 
 ```bash
 python -m pip install -r requirements.txt
-```
-
-Start the backend:
-
-```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
-Backend:
+Backend runs at `http://localhost:8000`, API docs at `http://localhost:8000/docs`.
 
-```text
-http://localhost:8000
-```
+### Frontend
 
-API documentation:
-
-```text
-http://localhost:8000/docs
-```
-
----
-
-## Frontend
-
-Open another terminal.
-
-From the project root:
+In a separate terminal:
 
 ```bash
 cd frontend
-```
-
-Install dependencies:
-
-```bash
 npm install
-```
-
-Start the development server:
-
-```bash
 npm run dev
 ```
 
-Frontend:
+Frontend runs at `http://localhost:5173`.
 
-```text
-http://localhost:5173
-```
-
----
-
-# 🐳 Docker Deployment
-
-From the project root:
-
-```bash
-docker compose build
-```
-
-Start the application:
-
-```bash
-docker compose up
-```
-
-Or build and start together:
+## Docker
 
 ```bash
 docker compose up --build
 ```
 
-The configured services are:
+This builds and starts both the backend and frontend containers. Endpoints are the same as running locally: frontend on `5173`, backend on `8000`, docs on `8000/docs`. This has been tested locally, not in any production environment.
 
-```text
-Backend
-Frontend
-```
-
-Expected local endpoints:
-
-```text
-Frontend:
-http://localhost:5173
-
-Backend:
-http://localhost:8000
-
-API Documentation:
-http://localhost:8000/docs
-```
-
----
-
-# 🔐 Environment Variables
-
-The application provides sensible defaults for local development.
-
-If custom configuration is required, create a `.env` file in the project root.
-
-**Never commit `.env` files or secrets to GitHub.**
-
-| Variable                | Default                            | Description               |
-| ----------------------- | ---------------------------------- | ------------------------- |
-| `DATABASE_URL`          | `sqlite:///./data/sonar_shield.db` | Database connection       |
-| `UPLOAD_DIR`            | `./data/uploads`                   | Uploaded image directory  |
-| `PROCESSED_DIR`         | `./data/processed`                 | Processed image directory |
-| `MAX_UPLOAD_SIZE_MB`    | `25`                               | Maximum upload size       |
-| `KNOWN_CLASS_THRESHOLD` | `0.70`                             | Confidence threshold      |
-| `DETECTOR_TYPE`         | `onnx`                             | Detector implementation   |
-| `ONNX_MODEL_PATH`       | `./models/weights.onnx`            | ONNX model path           |
-| `CLASS_NAMES_PATH`      | `./models/class_names.txt`         | Class mapping             |
-| `MODEL_VERSION`         | `GhostVision-ONNX-2026-01-27`      | Model version             |
-| `RISK_W_CONFIDENCE`     | `0.35`                             | Confidence weight         |
-| `RISK_W_SEVERITY`       | `0.25`                             | Severity weight           |
-| `RISK_W_SIZE`           | `0.20`                             | Size weight               |
-| `RISK_W_LOCATION`       | `0.20`                             | Location weight           |
-| `CORS_ORIGINS`          | `http://localhost:5173`            | Allowed frontend origin   |
-
----
-
-# 🧪 Testing
-
-SONAR-SHIELD includes an automated backend test suite.
-
-Run:
+## Testing
 
 ```bash
 cd backend
 pytest
 ```
 
-The test suite covers areas including:
-
-* Detection
-* Feedback
-* Health
-* Heatmap
-* Model APIs
-* Model loading
-* ONNX detector
-* Preprocessing
-* Image quality
-* Risk assessment
-* Reporting
-* Upload handling
-* Unknown anomaly handling
-
-For Windows environments where temporary-directory permissions cause pytest issues, a project-local temporary directory can be used:
+If you're on Windows and hitting temp-directory permission issues:
 
 ```bash
 pytest --basetemp .pytest_temp
 ```
 
----
-
-# ✅ Current Validation
-
-The current development environment successfully passed:
-
-```text
-46 / 46 backend tests
-```
-
-The test suite completed successfully with:
-
-```text
-46 passed
-2 warnings
-```
-
-The warnings were dependency deprecation warnings and did not cause test failures.
-
-The application has also been run successfully in the local development environment with:
-
-```text
-Backend API        → Working
-Frontend           → Working
-Frontend ↔ Backend → Working
-```
-
-These results demonstrate software-level functionality in the current development environment.
-
-They do not represent scientific validation of the AI model.
-
----
-
-# 🧠 Design Principles
-
-## Transparency
-
-SONAR-SHIELD separates:
-
-```text
-AI Prediction
-Prototype Risk Score
-Human Review
-```
-
-These represent different stages of the decision-support process.
-
----
-
-## Uncertainty Preservation
-
-Low-confidence predictions can become:
-
-```text
-UNKNOWN ANOMALY
-```
-
-instead of being incorrectly forced into a known class.
-
----
-
-## Evidence Integrity
-
-The system avoids intentionally fabricating evidence.
-
-Unavailable information can be represented as:
-
-```text
-Not available from current analysis
-```
-
----
-
-## Human Oversight
-
-AI predictions can be reviewed and corrected by human experts.
-
----
-
-## Original Result Preservation
-
-Human review does not erase the original AI prediction.
-
-This allows the system to preserve the history of:
-
-```text
-AI Decision
-      +
-Human Decision
-```
-
----
-
-## Modular Architecture
-
-Major components are separated into:
-
-```text
-AI
-Preprocessing
-Evidence
-Risk
-Priority
-API
-Frontend
-Database
-```
-
-This makes future upgrades easier.
-
----
-
-## No Unsupported Accuracy Claims
-
-The project does not claim precision, recall, F1, mAP, or other model-performance metrics without an appropriately evaluated dataset.
-
----
-
-# 🔒 Security Considerations
-
-The current system is primarily intended for prototype and local-development usage.
-
-A production deployment should additionally implement:
-
-* Authentication
-* Authorization
-* Role-based access control
-* Secure secret management
-* HTTPS
-* Rate limiting
-* Stronger file validation
-* Secure file storage
-* Audit logging
-* Production database security
-* Model access controls
-* Monitoring and logging
-
----
-
-# ⚠️ Limitations
-
-## Current AI Model
-
-The supplied GhostVision ONNX model currently contains a single class:
-
-```text
-Crab-Pot
-```
-
-Therefore, the current real detector should not be described as a fully validated multi-class marine-debris detector.
-
----
-
-## Dataset
-
-A production-grade system would require a significantly larger and domain-specific dataset containing:
-
-* Diverse sonar environments
-* Different depths
-* Different sonar devices
-* Different image resolutions
-* Different environmental conditions
-* Expert annotations
-* Multiple object categories
-
----
-
-## Model Validation
-
-A properly validated production model would require evaluation using metrics such as:
-
-* Precision
-* Recall
-* F1 Score
-* mAP
-* Confusion Matrix
-* Per-class performance
-* False-positive rate
-* False-negative rate
-
-These metrics should be calculated using an appropriately designed evaluation dataset.
-
----
-
-## Risk Score
-
-The current risk score is a prototype decision-support heuristic.
-
-It is not a scientifically validated environmental-risk measurement.
-
----
-
-## GPS
-
-Geospatial visualization depends on valid location metadata.
-
-The system does not fabricate GPS coordinates when location information is unavailable.
-
----
-
-## Automatic Retraining
-
-The current system does not automatically retrain the AI model.
-
-Expert feedback is stored as a foundation for potential future dataset creation and model improvement.
-
----
-
-## Hardware Integration
-
-The current application does not directly control underwater vehicles or sonar acquisition hardware.
-
----
-
-# 🔮 Future Scope
-
-## Multi-Class Marine Object Detection
-
-Future validated models could support additional underwater-object categories.
-
-Examples may include:
-
-```text
-Fishing Nets
-Fishing Gear
-Cables
-Containers
-Wreck Fragments
-Other Validated Sonar Objects
-```
-
-These categories should only be introduced after appropriate dataset creation and model validation.
-
----
-
-## Large-Scale Sonar Dataset
-
-A future dataset could contain:
-
-```text
-Sonar Image
-     +
-Object Class
-     +
-Bounding Box
-     +
-GPS
-     +
-Depth
-     +
-Expert Annotation
-     +
-Review Result
-```
-
-This could enable domain-specific model training and evaluation.
-
----
-
-## Model Benchmarking
-
-Future versions can provide:
-
-```text
-Precision
-Recall
-F1 Score
-mAP
-Confusion Matrix
-Per-Class Metrics
-False-Positive Rate
-False-Negative Rate
-```
-
-using properly separated training, validation, and test datasets.
-
----
-
-## Advanced Geospatial Intelligence
-
-Potential improvements include:
-
-* Survey-track visualization
-* Spatial clustering
-* Depth-aware visualization
-* Detection-density analysis
-* Geographic priority analysis
-* Survey coverage analysis
-
----
-
-## Human-in-the-Loop Learning
-
-The feedback system could eventually become a complete model-improvement pipeline:
-
-```text
-AI Prediction
-      ↓
-Expert Review
-      ↓
-Validated Data
-      ↓
-Dataset
-      ↓
-Training
-      ↓
-Evaluation
-      ↓
-Model Selection
-      ↓
-Deployment
-```
-
----
-
-## Production Database
-
-SQLite can eventually be replaced with a production database such as PostgreSQL.
-
----
-
-## Authentication & Authorization
-
-Future versions could support:
-
-* User accounts
-* Expert accounts
-* Administrator accounts
-* Role-based permissions
-* Audit trails
-
----
-
-## Cloud Deployment
-
-Potential future infrastructure could include:
-
-* Cloud object storage
-* Cloud databases
-* Background inference workers
-* Scalable model serving
-* Centralized monitoring
-* Centralized logging
-
----
-
-## Real Sonar Hardware Integration
-
-After appropriate validation, SONAR-SHIELD could be integrated with real sonar acquisition systems and underwater survey workflows.
-
----
-
-# 🤝 Responsible AI
-
-SONAR-SHIELD follows several principles intended to make AI-assisted decision support transparent.
-
-### AI predictions are not treated as absolute truth.
-
-Model predictions can be uncertain.
-
-### Uncertainty is preserved.
-
-Low-confidence results can be represented as:
-
-```text
-UNKNOWN ANOMALY
-```
-
-### Evidence is not fabricated.
-
-Unavailable information is clearly represented as unavailable.
-
-### Human experts remain involved.
-
-AI results can be confirmed, rejected, or reclassified.
-
-### Original predictions are preserved.
-
-Human review does not silently replace the original AI output.
-
-### Prototype risk scores are clearly identified.
-
-The current risk engine is a decision-support heuristic and not a scientifically validated environmental-risk model.
-
----
-
-# 📌 Project Status
-
-### Implemented
-
-```text
-🟢 Backend
-🟢 React Frontend
-🟢 AI Detection Architecture
-🟢 ONNX Model Integration
-🟢 Demo Detector
-🟢 Sonar Preprocessing
-🟢 Confidence Handling
-🟢 Unknown Anomaly Handling
-🟢 Evidence Engine
-🟢 Risk Engine
-🟢 Priority Engine
-🟢 Geospatial Visualization
-🟢 Expert Review
-🟢 Feedback Storage
-🟢 Reporting
-🟢 SQLite Persistence
-🟢 REST API
-🟢 Automated Tests
-🟢 Docker Configuration
-```
-
-### Future / Requires Further Validation
-
-```text
-🟡 Large-Scale Validated Sonar Dataset
-🟡 Scientific AI Model Evaluation
-🟡 Multi-Class Production Detector
-🟡 Production Authentication
-🟡 Production Database
-🟡 Automatic Model Retraining
-🟡 Real Sonar Hardware Integration
-🟡 Field Validation
-```
-
----
-
-# 📸 Screenshots
-
-Add project screenshots here when available.
-
-Recommended screenshots:
-
-```text
-Dashboard
-Sonar Analysis
-Detection Details
-Recovery Priority
-Interactive Map
-Heatmap
-Expert Review
-Reports
-Model Information
-```
-
-Example structure:
-
-```markdown
-![SONAR-SHIELD Dashboard](screenshots/dashboard.png)
-
-![Sonar Analysis](screenshots/sonar-analysis.png)
-
-![Detection Details](screenshots/detection-details.png)
-
-![Recovery Priority](screenshots/recovery-priority.png)
-
-![Map and Heatmap](screenshots/map.png)
-
-![Expert Review](screenshots/expert-review.png)
-```
-
----
-
-# 📚 Documentation
-
-The complete technical explanation of SONAR-SHIELD is maintained in this README.
-
-The README covers:
-
-```text
-Problem
-Solution
-Architecture
-Workflow
-AI Pipeline
-Preprocessing
-Model
-Confidence
-Unknown Anomalies
-Evidence
-Risk
-Priority
-Geospatial Intelligence
-Expert Review
-Feedback
-Reporting
-Technology Stack
-Frontend
-Backend
-Database
-API
-Project Structure
-Installation
-Docker
-Testing
-Validation
-Security
-Limitations
-Future Scope
-Responsible AI
-```
-
----
-
-# 🏁 Conclusion
-
-SONAR-SHIELD demonstrates how AI, computer vision, sonar-image processing, decision-support logic, geospatial visualization, database systems, and human review can be combined into a single underwater sonar intelligence platform.
-
-The system goes beyond simple object detection.
-
-Instead of only answering:
-
-```text
-"Was something detected?"
-```
-
-SONAR-SHIELD organizes a broader workflow:
-
-```text
-What was detected?
-        ↓
-How confident is the prediction?
-        ↓
-What evidence is available?
-        ↓
-What information is unavailable?
-        ↓
-What is the prototype risk?
-        ↓
-What is the recovery priority?
-        ↓
-Where is the detection?
-        ↓
-Can an expert review it?
-        ↓
-Can the result be reported?
-```
-
-The complete concept can therefore be summarized as:
-
-```text
-             ┌───────────┐
-             │  DETECT   │
-             └─────┬─────┘
-                   ↓
-             ┌───────────┐
-             │ UNDERSTAND│
-             └─────┬─────┘
-                   ↓
-             ┌───────────┐
-             │  ASSESS   │
-             └─────┬─────┘
-                   ↓
-             ┌───────────┐
-             │ PRIORITIZE│
-             └─────┬─────┘
-                   ↓
-             ┌───────────┐
-             │   REVIEW  │
-             └─────┬─────┘
-                   ↓
-             ┌───────────┐
-             │  REPORT   │
-             └───────────┘
-```
-
-SONAR-SHIELD provides the software foundation for this workflow while clearly separating what is currently implemented from what requires future scientific validation and production deployment.
-
----
-
-# ⚠️ Disclaimer
-
-SONAR-SHIELD is a research, demonstration, and decision-support prototype.
-
-The current system and its prototype risk scoring should not be used as the sole basis for real-world marine recovery, environmental, navigation, or safety decisions.
-
-Real-world deployment would require:
-
-* Validated side-scan sonar datasets
-* Domain-expert annotation
-* Formal AI model evaluation
-* Geolocation validation
-* Real sonar hardware integration
-* Field testing
-* Safety validation
-* Appropriate human oversight
-
----
-
-## 🌊 SONAR-SHIELD
-
-### Detect. Understand. Assess. Prioritize. Review. Report.
-
-**AI-assisted underwater sonar intelligence for a structured, transparent, and human-reviewed decision-support workflow.**
-
-```
-```
+Current result on the dev machine: **46 passed, 2 warnings**. The warnings are dependency deprecation notices, not failures. This confirms the backend logic works as expected in the current test suite — it says nothing about the AI model's real-world accuracy, since that hasn't been evaluated on a labeled dataset.
+
+## Limitations
+
+- **Model**: single-class (Crab-Pot) detector, not a multi-class marine-debris system.
+- **Dataset**: no large, diverse, annotated sonar dataset behind this yet.
+- **Validation**: no precision/recall/F1/mAP numbers — those require a proper evaluation set that doesn't exist yet.
+- **Risk score**: a configurable heuristic, not a scientifically validated risk measurement.
+- **GPS**: if location metadata isn't provided, the system doesn't fabricate coordinates — no map/heatmap data for that detection.
+- **Retraining**: expert feedback is stored but not automatically used to retrain the model.
+- **Hardware**: no direct integration with sonar acquisition hardware or underwater vehicles.
+- **Security**: no auth/RBAC yet — this is meant for local/dev use, not a public deployment.
+
+## Future improvements
+
+- Additional validated classes (nets, cables, containers, wreck fragments, etc.) once there's a proper dataset and evaluation behind them
+- Actual model benchmarking (precision, recall, F1, mAP, confusion matrix) on held-out data
+- Swapping SQLite for something like PostgreSQL for anything beyond local use
+- Auth and role-based access
+- Turning the feedback loop into an actual retraining pipeline
+- Better geospatial tooling (survey-track visualization, spatial clustering, coverage analysis)
+
+## Disclaimer
+
+SONAR-SHIELD is a prototype built for research/demonstration purposes. The risk scores and priority levels it produces should not be used as the sole basis for real marine recovery, environmental, navigation, or safety decisions. Any real-world use would need a validated dataset, expert annotation, formal model evaluation, real sonar hardware integration, and field testing.
